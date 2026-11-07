@@ -1003,16 +1003,24 @@ def _previous_user_message_text(conversation_history: Optional[list[Any]]) -> st
     compaction hands back a list that already ends in this turn's message, and rotation hands back none.
     Runtime scaffolding in the user role (continue nudges, task-list snapshots, compaction summaries) is
     skipped, so the value is what the person last asked. A compaction carrier contributes the live ask it
-    wraps, and an image-only turn ends the search with ``""`` rather than falling back to an older ask."""
+    wraps, and an image-only turn ends the search with ``""`` rather than falling back to an older ask.
+    It must match what a live process keyed its end-of-turn recall on, the turn's clean persisted ask: a
+    gateway timestamp prefix comes off, and a mid-turn /steer is skipped (gateway replay drops its type)."""
     from agent.context_compressor import user_originated_turn_view
     from agent.conversation_compression_scaffolding import is_user_role_scaffolding
+    from agent.prompt_builder import STEER_DISPLAY_KIND, STEER_MARKER_OPEN
+    from gateway.message_timestamps import strip_leading_message_timestamps
 
     for message in reversed(conversation_history or []):
-        # The canonical view cannot see metadata-flagged scaffolding, so screen it out first.
-        if not isinstance(message, dict) or message.get("role") != "user" or is_user_role_scaffolding(message):
+        if not isinstance(message, dict) or message.get("role") != "user":
             continue
-        live_view = user_originated_turn_view(message)
-        if live_view is not None:
+        content = message.get("content")
+        if isinstance(content, str) and (clean := strip_leading_message_timestamps(content)[0]) != content:
+            message = {**message, "content": clean}
+        if message.get("display_kind") == STEER_DISPLAY_KIND or str(message.get("content")).startswith(STEER_MARKER_OPEN):
+            continue
+        # The canonical view cannot see metadata-flagged scaffolding, so screen it out first.
+        if not is_user_role_scaffolding(message) and (live_view := user_originated_turn_view(message)) is not None:
             return _memory_query_text(live_view.get("content"))
     return ""
 
