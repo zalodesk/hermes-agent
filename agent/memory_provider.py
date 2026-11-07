@@ -180,9 +180,9 @@ class MemoryProvider(ABC):
         author_is_bot, previous_message. ``model`` is the turn's primary model id at turn start ("" when unset; a
         preset name under mixture-of-agents). The author trio names who wrote THIS turn (None, None, False without
         one): a shared session carries several participants, so a provider keying durable state on identity must read
-        it per turn. ``previous_message`` is the text of the last user message before this turn ("" on a first turn),
-        from the transcript Hermes holds, so a process that resumed a session can catch up on work a live process
-        would have queued at the end of that turn."""
+        it per turn. ``previous_message`` is the secret-scrubbed text of the person's last message before this turn
+        (runtime user-role rows and /steer messages skipped; "" on a first turn or an image-only one), from the
+        transcript Hermes holds, so a resumed process can redo what a live one queued at the end of that turn."""
 
     def identity_signature(self) -> dict[str, Any]:
         """Identity-mapping values that must bust a cached gateway agent when they change (writer identity, alias
